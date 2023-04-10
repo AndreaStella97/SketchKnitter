@@ -11,3 +11,4 @@ scipy
 requests
 tqdm
 tensorflow >=2.1
+mpi4py

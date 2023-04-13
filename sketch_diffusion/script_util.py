@@ -9,7 +9,7 @@ from .respace import SpacedDiffusion_noise
 from .respace import SpacedDiffusion_acc
 from .unet import SuperResModel, UNetModel, AttentionBlock
 
-NUM_CLASSES = 1000
+NUM_CLASSES = 2
 
 def diffusion_defaults():
     return dict(

@@ -41,8 +41,6 @@ def main():
         category=["house.npz"],
         class_cond=False,
     )
-    
-    print(data)
 
     logger.log("training...")
     TrainLoop(

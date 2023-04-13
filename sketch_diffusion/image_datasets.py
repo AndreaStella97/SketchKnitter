@@ -55,6 +55,8 @@ def load_data(
         mode="train",
         Nmax=Nmax,
     )
+    print(dataset.classes)
+    print(dataset.category)
     if deterministic:
         loader = DataLoader(
             dataset, batch_size=batch_size, shuffle=False, num_workers=1, drop_last=True

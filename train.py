@@ -39,7 +39,7 @@ def main():
         batch_size=args.batch_size,
         image_size=args.image_size,
         category=["house.npz"],
-        class_cond=True,
+        class_cond=False,
     )
 
     logger.log("training...")

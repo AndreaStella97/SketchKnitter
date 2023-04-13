@@ -38,8 +38,8 @@ def main():
         data_dir=args.data_dir,
         batch_size=args.batch_size,
         image_size=args.image_size,
-        category=["house.npz"],
-        class_cond=False,
+        category=["house.npz", "cat.npz"],
+        class_cond=True,
     )
 
     logger.log("training...")

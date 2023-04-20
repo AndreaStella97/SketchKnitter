@@ -349,9 +349,9 @@ class UNetModel(nn.Module):
         return next(self.input_blocks.parameters()).dtype
 
     def forward(self, x, timesteps, y=None):
-        assert (y is not None) == (
-            self.num_classes is not None
-        ), "must specify y if and only if the model is class-conditional"
+        #assert (y is not None) == (
+        #    self.num_classes is not None
+        #), "must specify y if and only if the model is class-conditional"
 
         hs = []
         emb = self.time_embed(timestep_embedding(timesteps, self.model_channels))

@@ -25,7 +25,7 @@ def bin_pen(x, pen_break=0.005):
                 else:
                     result[i][j][2] = 0
     return result
-
+class_cond=False,
 def main():
     args = create_argparser().parse_args()
 

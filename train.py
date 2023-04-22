@@ -38,8 +38,7 @@ def main():
         data_dir=args.data_dir,
         batch_size=args.batch_size,
         image_size=args.image_size,
-        category=["moon.npz", "airplane.npz", "fish.npz", "umbrella.npz", "train.npz",
-                  "spider.npz", "shoe.npz", "apple.npz", "lion.npz", "bus.npz"],
+        category=["moon.npz", "airplane.npz"],
         class_cond=False,
     )
 

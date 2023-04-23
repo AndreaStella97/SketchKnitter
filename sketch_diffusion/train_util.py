@@ -287,7 +287,6 @@ class TrainLoop:
         sample_all = th.cat((sample, pen_state), 2).cpu()
         sample_all = bin_pen(sample_all, self.pen_break)
         sample_all = sample_all.numpy()
-        print(sample_all)
         save_path = f"{self.train_samples_dir}/sample{self.step}"
         np.save(save_path, sample_all)
 

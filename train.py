@@ -6,9 +6,9 @@ from sketch_diffusion.image_datasets import load_data
 from sketch_diffusion.resample import create_named_schedule_sampler
 from sketch_diffusion.script_util import (
     model_and_diffusion_defaults,
-    create_model_and_diffusion, # you can change mode here
+    create_model_and_diffusion,  # you can change mode here
     args_to_dict,
-    add_dict_to_argparser,
+    add_dict_to_argparser, create_model_and_diffusion_noise,
 )
 from sketch_diffusion.train_util import TrainLoop
 
@@ -21,6 +21,8 @@ def main():
         os.makedirs(args.log_dir)
     if not os.path.exists(args.log_dir):
         os.makedirs(args.log_dir)
+    if not os.path.exists(args.train_samples_dir):
+        os.makedirs(args.train_samples_dir)
 
     dist_util.setup_dist()
     logger.configure(args.log_dir)
@@ -32,6 +34,11 @@ def main():
 
     model.to(dist_util.dev())
     schedule_sampler = create_named_schedule_sampler(args.schedule_sampler, diffusion)
+
+    logger.log("creating diffusion noise...")
+    diffusion_noise = create_model_and_diffusion_noise(
+        **args_to_dict(args, model_and_diffusion_defaults().keys())
+    )[1]
 
     logger.log("creating data loader...")
     data = load_data(
@@ -46,6 +53,7 @@ def main():
     TrainLoop(
         model=model,
         diffusion=diffusion,
+        diffusion_noise=diffusion_noise,
         data=data,
         batch_size=args.batch_size,
         microbatch=args.microbatch,
@@ -59,6 +67,12 @@ def main():
         schedule_sampler=schedule_sampler,
         weight_decay=args.weight_decay,
         lr_anneal_steps=args.lr_anneal_steps,
+        sample_batch_size=args.sample_batch_size,
+        sample_interval=args.sample_interval,
+        use_ddim=args.use_ddim,
+        clip_denoised=args.clip_denoised,
+        train_samples_dir=args.train_samples_dir,
+        pen_break=args.pen_break
     ).run_loop()
 
 
@@ -78,6 +92,12 @@ def create_argparser():
         use_fp16=False,
         fp16_scale_growth=1e-3,
         log_dir='./debug',
+        sample_batch_size=16,
+        sample_interval=200,
+        use_ddim=False,
+        clip_denoised=True,
+        train_samples_dir='./train_samples',
+        pen_break=0.5
     )
     defaults.update(model_and_diffusion_defaults())
     parser = argparse.ArgumentParser()

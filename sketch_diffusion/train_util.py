@@ -7,11 +7,14 @@ import torch as th
 import torch.distributed as dist
 from torch.nn.parallel.distributed import DistributedDataParallel as DDP
 from torch.optim import AdamW
+import numpy as np
 
 from . import dist_util, logger
 from .fp16_util import MixedPrecisionTrainer
 from .nn import update_ema
 from .resample import LossAwareSampler, UniformSampler
+
+from sample import bin_pen
 
 # For ImageNet experiments, this was a good default value.
 # We found that the lg_loss_scale quickly climbed to
@@ -25,6 +28,7 @@ class TrainLoop:
         *,
         model,
         diffusion,
+        diffusion_noise,
         data,
         batch_size,
         microbatch,
@@ -38,9 +42,16 @@ class TrainLoop:
         schedule_sampler=None,
         weight_decay=0.0,
         lr_anneal_steps=0,
+        sample_batch_size=16,
+        sample_interval=200,
+        use_ddim=False,
+        clip_denoised=True,
+        train_samples_dir='./train_samples',
+        pen_break=0.5
     ):
         self.model = model
         self.diffusion = diffusion
+        self.diffusion_noise = diffusion_noise
         self.data = data
         self.batch_size = batch_size
         self.microbatch = microbatch if microbatch > 0 else batch_size
@@ -58,6 +69,12 @@ class TrainLoop:
         self.schedule_sampler = schedule_sampler or UniformSampler(diffusion)
         self.weight_decay = weight_decay
         self.lr_anneal_steps = lr_anneal_steps
+        self.sample_batch_size = sample_batch_size
+        self.sample_interval = sample_interval
+        self.use_ddim = use_ddim
+        self.clip_denoised = clip_denoised
+        self.train_samples_dir = train_samples_dir
+        self.pen_break = pen_break
 
         self.step = 0
         self.resume_step = 0
@@ -164,6 +181,8 @@ class TrainLoop:
                 # Run for a finite amount of time in integration tests.
                 if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:
                     return
+            if self.step % self.sample_interval == 0:
+                self.save_sample()
             self.step += 1
         # Save the last checkpoint if it wasn't already saved.
         if (self.step - 1) % self.save_interval != 0:
@@ -253,6 +272,26 @@ class TrainLoop:
                 th.save(self.opt.state_dict(), f)
 
         dist.barrier()
+
+    def save_sample(self):
+        logger.log("sampling...")
+        sample_fn = (
+            self.diffusion_noise.p_sample_loop if not self.use_ddim else self.diffusion_noise.ddim_sample_loop
+        )
+        sample, pen_state, model_output = sample_fn(
+            self.model,
+            (self.sample_batch_size, 96, 2),
+            clip_denoised=self.clip_denoised,
+            model_kwargs={},
+        )
+        sample_all = th.cat((sample, pen_state), 2).cpu()
+        sample_all = bin_pen(sample_all, self.pen_break)
+        sample_all = sample_all.numpy()
+        print(sample_all)
+        save_path = f"{self.train_samples_dir}/sample{self.step}"
+        np.save(save_path, sample_all)
+
+
 
 
 def parse_resume_step_from_filename(filename):

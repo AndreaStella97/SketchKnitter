@@ -1,6 +1,7 @@
 import argparse
 import os
 import torch as th
+import numpy as np
 
 from sketch_diffusion import dist_util, logger
 from sketch_diffusion.script_util import (
@@ -53,6 +54,7 @@ def main():
 
     logger.log("sampling...")
     all_images = []
+    img_index = 0
     while len(all_images) * args.batch_size < args.num_samples:
         model_kwargs = {}
         if args.class_cond:
@@ -71,7 +73,11 @@ def main():
         )
         sample_all = th.cat((sample, pen_state), 2).cpu()
         sample_all = bin_pen(sample_all, args.pen_break)
+        sample_all = sample_all.numpy()
+        save_path = f"{args.save_path}/sample{str(img_index)}"
+        np.save(save_path, sample_all)
         print(f"sample all {sample_all} is saved!")
+        img_index += 1
 
 def create_argparser():
     defaults = dict(

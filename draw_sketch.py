@@ -88,7 +88,7 @@ class SketchData(object):
  
  
 if __name__ == '__main__':
-    sketchdata = SketchData(dataPath='./train_samples')
+    sketchdata = SketchData(dataPath='./train_samples_draw')
     category_list = sketchdata.getCategory()
     dataset_origin_list = sketchdata.load()
 

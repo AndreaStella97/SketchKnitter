@@ -3,55 +3,48 @@ import functools
 import os
 
 import blobfile as bf
+import numpy as np
 import torch as th
 import torch.distributed as dist
 from torch.nn.parallel.distributed import DistributedDataParallel as DDP
 from torch.optim import AdamW
-import numpy as np
 
 from . import dist_util, logger
-from .fp16_util import MixedPrecisionTrainer
+from .fp16_util import (
+    make_master_params,
+    master_params_to_model_params,
+    model_grads_to_master_grads,
+    unflatten_master_params,
+    zero_grad,
+)
 from .nn import update_ema
 from .resample import LossAwareSampler, UniformSampler
 
-from sample import bin_pen
-
-# For ImageNet experiments, this was a good default value.
-# We found that the lg_loss_scale quickly climbed to
-# 20-21 within the first ~1K steps of training.
 INITIAL_LOG_LOSS_SCALE = 20.0
 
 
 class TrainLoop:
     def __init__(
-        self,
-        *,
-        model,
-        diffusion,
-        diffusion_noise,
-        data,
-        batch_size,
-        microbatch,
-        lr,
-        ema_rate,
-        log_interval,
-        save_interval,
-        resume_checkpoint,
-        use_fp16=False,
-        fp16_scale_growth=1e-3,
-        schedule_sampler=None,
-        weight_decay=0.0,
-        lr_anneal_steps=0,
-        sample_batch_size=16,
-        sample_interval=200,
-        use_ddim=False,
-        clip_denoised=True,
-        train_samples_dir='./train_samples',
-        pen_break=0.5
+            self,
+            *,
+            model,
+            diffusion,
+            data,
+            batch_size,
+            microbatch,
+            lr,
+            ema_rate,
+            log_interval,
+            save_interval,
+            resume_checkpoint,
+            use_fp16=False,
+            fp16_scale_growth=1e-3,
+            schedule_sampler=None,
+            weight_decay=0.0,
+            lr_anneal_steps=0,
     ):
         self.model = model
         self.diffusion = diffusion
-        self.diffusion_noise = diffusion_noise
         self.data = data
         self.batch_size = batch_size
         self.microbatch = microbatch if microbatch > 0 else batch_size
@@ -69,40 +62,29 @@ class TrainLoop:
         self.schedule_sampler = schedule_sampler or UniformSampler(diffusion)
         self.weight_decay = weight_decay
         self.lr_anneal_steps = lr_anneal_steps
-        self.sample_batch_size = sample_batch_size
-        self.sample_interval = sample_interval
-        self.use_ddim = use_ddim
-        self.clip_denoised = clip_denoised
-        self.train_samples_dir = train_samples_dir
-        self.pen_break = pen_break
 
         self.step = 0
         self.resume_step = 0
         self.global_batch = self.batch_size * dist.get_world_size()
 
+        self.model_params = list(self.model.parameters())
+        self.master_params = self.model_params
+        self.lg_loss_scale = INITIAL_LOG_LOSS_SCALE
         self.sync_cuda = th.cuda.is_available()
 
         self._load_and_sync_parameters()
-        self.mp_trainer = MixedPrecisionTrainer(
-            model=self.model,
-            use_fp16=self.use_fp16,
-            fp16_scale_growth=fp16_scale_growth,
-        )
+        if self.use_fp16:
+            self._setup_fp16()
 
-        self.opt = AdamW(
-            self.mp_trainer.master_params, lr=self.lr, weight_decay=self.weight_decay
-        )
+        self.opt = AdamW(self.master_params, lr=self.lr, weight_decay=self.weight_decay)
         if self.resume_step:
             self._load_optimizer_state()
-            # Model was resumed, either due to a restart or a checkpoint
-            # being specified at the command line.
             self.ema_params = [
                 self._load_ema_parameters(rate) for rate in self.ema_rate
             ]
         else:
             self.ema_params = [
-                copy.deepcopy(self.mp_trainer.master_params)
-                for _ in range(len(self.ema_rate))
+                copy.deepcopy(self.master_params) for _ in range(len(self.ema_rate))
             ]
 
         if th.cuda.is_available():
@@ -140,7 +122,7 @@ class TrainLoop:
         dist_util.sync_params(self.model.parameters())
 
     def _load_ema_parameters(self, rate):
-        ema_params = copy.deepcopy(self.mp_trainer.master_params)
+        ema_params = copy.deepcopy(self.master_params)
 
         main_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
         ema_checkpoint = find_ema_checkpoint(main_checkpoint, self.resume_step, rate)
@@ -150,7 +132,7 @@ class TrainLoop:
                 state_dict = dist_util.load_state_dict(
                     ema_checkpoint, map_location=dist_util.dev()
                 )
-                ema_params = self.mp_trainer.state_dict_to_master_params(state_dict)
+                ema_params = self._state_dict_to_master_params(state_dict)
 
         dist_util.sync_params(ema_params)
         return ema_params
@@ -167,45 +149,47 @@ class TrainLoop:
             )
             self.opt.load_state_dict(state_dict)
 
+    def _setup_fp16(self):
+        self.master_params = make_master_params(self.model_params)
+        self.model.convert_to_fp16()
+
     def run_loop(self):
         while (
-            not self.lr_anneal_steps
-            or self.step + self.resume_step < self.lr_anneal_steps
+                self.step + self.resume_step < 50001
         ):
-            batch, cond = next(self.data)
-            self.run_step(batch, cond)
+            batch, _ = next(self.data)
+            batch = batch.to(dist_util.dev())
+            if self.use_fp16:
+                batch = batch.type(th.FloatTensor)
+            self.run_step(batch, {})
             if self.step % self.log_interval == 0:
                 logger.dumpkvs()
             if self.step % self.save_interval == 0:
                 self.save()
-                # Run for a finite amount of time in integration tests.
                 if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:
                     return
-            if self.step % self.sample_interval == 0:
-                self.save_sample()
             self.step += 1
-        # Save the last checkpoint if it wasn't already saved.
         if (self.step - 1) % self.save_interval != 0:
             self.save()
 
     def run_step(self, batch, cond):
         self.forward_backward(batch, cond)
-        took_step = self.mp_trainer.optimize(self.opt)
-        if took_step:
-            self._update_ema()
-        self._anneal_lr()
+        if self.use_fp16:
+            self.optimize_fp16()
+        else:
+            self.optimize_normal()
         self.log_step()
 
     def forward_backward(self, batch, cond):
-        self.mp_trainer.zero_grad()
+        zero_grad(self.model_params)
         for i in range(0, batch.shape[0], self.microbatch):
-            micro = batch[i : i + self.microbatch].to(dist_util.dev())
+            micro = batch[i: i + self.microbatch].to(dist_util.dev())
             micro_cond = {
-                k: v[i : i + self.microbatch].to(dist_util.dev())
+                k: v[i: i + self.microbatch].to(dist_util.dev())
                 for k, v in cond.items()
             }
             last_batch = (i + self.microbatch) >= batch.shape[0]
-            t, weights = self.schedule_sampler.sample(micro.shape[0], dist_util.dev())
+            t, weights = self.schedule_sampler.sample(micro.shape[0], dist_util.dev())  # t.shape=[B]
 
             compute_losses = functools.partial(
                 self.diffusion.training_losses,
@@ -216,25 +200,54 @@ class TrainLoop:
             )
 
             if last_batch or not self.use_ddp:
-                losses = compute_losses()
+                losses = compute_losses()  # losses['mse'].shape=[B] losses['loss'].shape=[B]
             else:
                 with self.ddp_model.no_sync():
                     losses = compute_losses()
 
-            if isinstance(self.schedule_sampler, LossAwareSampler):
+            if isinstance(self.schedule_sampler, LossAwareSampler):  # False
                 self.schedule_sampler.update_with_local_losses(
                     t, losses["loss"].detach()
                 )
 
-            loss = (losses["loss"] * weights).mean()
+            loss = (losses["loss"] * weights).mean()  # loss = (0.9931, device='cuda:0', grad_fn=<MeanBackward0>)
             log_loss_dict(
                 self.diffusion, t, {k: v * weights for k, v in losses.items()}
             )
-            self.mp_trainer.backward(loss)
+            if self.use_fp16:  # False
+                loss_scale = 2 ** self.lg_loss_scale
+                (loss * loss_scale).backward()
+            else:
+                loss.backward()
 
-    def _update_ema(self):
+    def optimize_fp16(self):
+        if any(not th.isfinite(p.grad).all() for p in self.model_params):
+            self.lg_loss_scale -= 1
+            logger.log(f"Found NaN, decreased lg_loss_scale to {self.lg_loss_scale}")
+            return
+
+        model_grads_to_master_grads(self.model_params, self.master_params)
+        self.master_params[0].grad.mul_(1.0 / (2 ** self.lg_loss_scale))
+        self._log_grad_norm()
+        self._anneal_lr()
+        self.opt.step()
         for rate, params in zip(self.ema_rate, self.ema_params):
-            update_ema(params, self.mp_trainer.master_params, rate=rate)
+            update_ema(params, self.master_params, rate=rate)
+        master_params_to_model_params(self.model_params, self.master_params)
+        self.lg_loss_scale += self.fp16_scale_growth
+
+    def optimize_normal(self):
+        self._log_grad_norm()
+        self._anneal_lr()
+        self.opt.step()
+        for rate, params in zip(self.ema_rate, self.ema_params):
+            update_ema(params, self.master_params, rate=rate)
+
+    def _log_grad_norm(self):
+        sqsum = 0.0
+        for p in self.master_params:
+            sqsum += (p.grad ** 2).sum().item()
+        logger.logkv_mean("grad_norm", np.sqrt(sqsum))
 
     def _anneal_lr(self):
         if not self.lr_anneal_steps:
@@ -247,57 +260,55 @@ class TrainLoop:
     def log_step(self):
         logger.logkv("step", self.step + self.resume_step)
         logger.logkv("samples", (self.step + self.resume_step + 1) * self.global_batch)
+        if self.use_fp16:
+            logger.logkv("lg_loss_scale", self.lg_loss_scale)
 
     def save(self):
         def save_checkpoint(rate, params):
-            state_dict = self.mp_trainer.master_params_to_state_dict(params)
+            state_dict = self._master_params_to_state_dict(params)
             if dist.get_rank() == 0:
                 logger.log(f"saving model {rate}...")
                 if not rate:
-                    filename = f"model{(self.step+self.resume_step):06d}.pt"
+                    filename = f"model{(self.step + self.resume_step):06d}.pt"
                 else:
-                    filename = f"ema_{rate}_{(self.step+self.resume_step):06d}.pt"
+                    filename = f"ema_{rate}_{(self.step + self.resume_step):06d}.pt"
                 with bf.BlobFile(bf.join(get_blob_logdir(), filename), "wb") as f:
                     th.save(state_dict, f)
+                print('save model at : {}'.format(bf.join(get_blob_logdir(), filename)))
 
-        save_checkpoint(0, self.mp_trainer.master_params)
+        save_checkpoint(0, self.master_params)
         for rate, params in zip(self.ema_rate, self.ema_params):
             save_checkpoint(rate, params)
 
         if dist.get_rank() == 0:
             with bf.BlobFile(
-                bf.join(get_blob_logdir(), f"opt{(self.step+self.resume_step):06d}.pt"),
-                "wb",
+                    bf.join(get_blob_logdir(), f"opt{(self.step + self.resume_step):06d}.pt"),
+                    "wb",
             ) as f:
                 th.save(self.opt.state_dict(), f)
 
         dist.barrier()
 
-    def save_sample(self):
-        logger.log("sampling...")
-        sample_fn = (
-            self.diffusion_noise.p_sample_loop if not self.use_ddim else self.diffusion_noise.ddim_sample_loop
-        )
-        sample, pen_state, model_output = sample_fn(
-            self.model,
-            (self.sample_batch_size, 96, 2),
-            clip_denoised=self.clip_denoised,
-            model_kwargs={},
-        )
-        sample_all = th.cat((sample, pen_state), 2).cpu()
-        sample_all = bin_pen(sample_all, self.pen_break)
-        sample_all = sample_all.numpy()
-        save_path = f"{self.train_samples_dir}/sample{self.step}"
-        np.save(save_path, sample_all)
+    def _master_params_to_state_dict(self, master_params):
+        if self.use_fp16:
+            master_params = unflatten_master_params(
+                self.model.parameters(), master_params
+            )
+        state_dict = self.model.state_dict()
+        for i, (name, _value) in enumerate(self.model.named_parameters()):
+            assert name in state_dict
+            state_dict[name] = master_params[i]
+        return state_dict
 
-
+    def _state_dict_to_master_params(self, state_dict):
+        params = [state_dict[name] for name, _ in self.model.named_parameters()]
+        if self.use_fp16:
+            return make_master_params(params)
+        else:
+            return params
 
 
 def parse_resume_step_from_filename(filename):
-    """
-    Parse filenames of the form path/to/modelNNNNNN.pt, where NNNNNN is the
-    checkpoint's number of steps.
-    """
     split = filename.split("model")
     if len(split) < 2:
         return 0
@@ -309,14 +320,10 @@ def parse_resume_step_from_filename(filename):
 
 
 def get_blob_logdir():
-    # You can change this to be a separate path to save checkpoints to
-    # a blobstore or some external drive.
-    return logger.get_dir()
+    return os.environ.get("DIFFUSION_BLOB_LOGDIR", logger.get_dir())
 
 
 def find_resume_checkpoint():
-    # On your infrastructure, you may want to override this to automatically
-    # discover the latest checkpoint on your blob storage, etc.
     return None
 
 

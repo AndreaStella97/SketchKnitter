@@ -320,9 +320,9 @@ class TrainLoop:
         )
         sample_all = th.cat((sample, pen_state), 2).cpu()
         sample_all = bin_pen(sample_all, self.pen_break)
-        sample_all = sample_all.numpy()
+        sample_all = sample_all.numpy()[:, :, :-1]
         save_path = f"{self.train_samples_dir}/sample{self.step}"
-        np.savez_compressed(save_path, train=sample_all[:, :, :-1])
+        np.savez_compressed(save_path, train=sample_all)
 
     def _master_params_to_state_dict(self, master_params):
         if self.use_fp16:

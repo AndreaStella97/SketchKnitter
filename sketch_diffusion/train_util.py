@@ -322,7 +322,7 @@ class TrainLoop:
         sample_all = bin_pen(sample_all, self.pen_break)
         sample_all = sample_all.numpy()
         save_path = f"{self.train_samples_dir}/sample{self.step}"
-        np.save(save_path, sample_all)
+        np.savez_compressed(save_path, train=sample_all[:, :, :-1])
 
     def _master_params_to_state_dict(self, master_params):
         if self.use_fp16:

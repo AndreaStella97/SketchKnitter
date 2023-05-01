@@ -20,6 +20,8 @@ from .fp16_util import (
 from .nn import update_ema
 from .resample import LossAwareSampler, UniformSampler
 
+from sample import bin_pen
+
 INITIAL_LOG_LOSS_SCALE = 20.0
 
 

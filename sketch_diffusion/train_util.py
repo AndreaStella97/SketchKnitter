@@ -189,7 +189,7 @@ class TrainLoop:
                 if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:
                     return
             if self.step % self.sample_interval == 0:
-                self.save_sample()
+                self.log_sample()
             self.step += 1
         if (self.step - 1) % self.save_interval != 0:
             self.save()
@@ -314,7 +314,7 @@ class TrainLoop:
 
         dist.barrier()
 
-    def save_sample(self):
+    def log_sample(self):
         logger.log("sampling...")
         sample_fn = (
             self.diffusion_noise.p_sample_loop if not self.use_ddim else self.diffusion_noise.ddim_sample_loop

@@ -233,6 +233,9 @@ class TrainLoop:
                 )
 
             loss = (losses["loss"] * weights).mean()  # loss = (0.9931, device='cuda:0', grad_fn=<MeanBackward0>)
+
+            self.run.log({'loss': loss})
+
             log_loss_dict(
                 self.diffusion, t, {k: v * weights for k, v in losses.items()}
             )

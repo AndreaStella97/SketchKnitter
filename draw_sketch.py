@@ -85,30 +85,53 @@ class SketchData(object):
     def getCategory(self):
         category_list = os.listdir(self.dataPath)
         return category_list
- 
+
+    def save_sketches(self):
+        category_list = self.getCategory()
+        dataset_origin_list = self.load()
+
+        for category_index in range(len(category_list)):
+            sample_category_name = category_list[category_index]
+            print(sample_category_name)
+            save_name = sample_category_name.replace(".npz", "")
+            folder = os.path.exists(f"./save_sketch/{save_name}/")
+            if not folder:
+                os.makedirs(f"./save_sketch/{save_name}/")
+                print(f"./save_sketch/{save_name}/ is new mkdir!")
+            drawsketch = DrawSketch()
+
+            for image_index in range(10):
+                # sample_sketch = dataset_origin_list[sample_category_name.index(sample_category_name)][index]
+                sample_sketch = dataset_origin_list[category_list.index(sample_category_name)][image_index]
+                sketch_cv = drawsketch.draw_three(sample_sketch, True)
+                plt.xticks([])
+                plt.yticks([])
+                plt.axis('off')
+                plt.imshow(sketch_cv)
+                plt.savefig(f"./save_sketch/{save_name}/{image_index}.jpg")
+                print(f"{save_name}/{image_index}.jpg is saved!")
+
+    def merge_sketches(self, folder_path):
+        image_list = []
+
+        for filename in os.listdir(folder_path):
+            if filename.endswith('.jpg'):
+                image_path = os.path.join(folder_path, filename)
+                image = Image.open(image_path)
+                image_list.append(image)
+
+        widths, heights = zip(*(i.size for i in image_list))
+
+        new_image = Image.new('RGB', (sum(widths), max(heights)))
+
+        x_offset = 0
+        for image in image_list:
+            new_image.paste(image, (x_offset, 0))
+            x_offset += image.size[0]
+
+        new_image.save('merged_sketch.jpg')
+
  
 if __name__ == '__main__':
-    sketchdata = SketchData(dataPath='./train_samples_draw')
-    category_list = sketchdata.getCategory()
-    dataset_origin_list = sketchdata.load()
-
-    for category_index in range(len(category_list)):
-        sample_category_name = category_list[category_index]
-        print(sample_category_name)
-        save_name = sample_category_name.replace(".npz", "")
-        folder = os.path.exists(f"./save_sketch/{save_name}/")
-        if not folder:
-            os.makedirs(f"./save_sketch/{save_name}/")
-            print(f"./save_sketch/{save_name}/ is new mkdir!")
-        drawsketch = DrawSketch()
-
-        for image_index in range(10):
-            # sample_sketch = dataset_origin_list[sample_category_name.index(sample_category_name)][index]
-            sample_sketch = dataset_origin_list[category_list.index(sample_category_name)][image_index]
-            sketch_cv = drawsketch.draw_three(sample_sketch, True)
-            plt.xticks([])
-            plt.yticks([])
-            plt.axis('off')
-            plt.imshow(sketch_cv)
-            plt.savefig(f"./save_sketch/{save_name}/{image_index}.jpg")
-            print(f"{save_name}/{image_index}.jpg is saved!")
+    sketchdata = SketchData(dataPath='./train_samples')
+    sketchdata.save_sketches()

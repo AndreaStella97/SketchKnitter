@@ -1,6 +1,8 @@
 import copy
 import functools
 import os
+import wandb
+from draw_sketch import SketchData
 
 import blobfile as bf
 import numpy as np
@@ -121,6 +123,8 @@ class TrainLoop:
                 )
             self.use_ddp = False
             self.ddp_model = self.model
+
+        self.run = wandb.init(project="diffusion_model_vectorized", entity="andrea_stella_thesis")
 
     def _load_and_sync_parameters(self):
         resume_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
@@ -321,8 +325,13 @@ class TrainLoop:
         sample_all = th.cat((sample, pen_state), 2).cpu()
         sample_all = bin_pen(sample_all, self.pen_break)
         sample_all = sample_all.numpy()[:, :, :-1]
-        save_path = f"{self.train_samples_dir}/sample{self.step}"
+        save_path = f"{self.train_samples_dir}/samples"
         np.savez_compressed(save_path, train=sample_all)
+
+        sketchdata = SketchData(dataPath=self.train_samples_dir)
+        sketchdata.save_sketches()
+        sketchdata.merge_sketches('save_sketch/samples')
+        self.run.log({"samples": wandb.Image("merged_sketch.jpg")})
 
     def _master_params_to_state_dict(self, master_params):
         if self.use_fp16:

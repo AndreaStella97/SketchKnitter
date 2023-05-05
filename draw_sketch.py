@@ -87,6 +87,11 @@ class SketchData(object):
         return category_list
 
     def save_sketches(self):
+        import time
+
+        # Misura il tempo di inizio
+        start_time = time.time()
+
         category_list = self.getCategory()
         dataset_origin_list = self.load()
 
@@ -110,6 +115,12 @@ class SketchData(object):
                 plt.imshow(sketch_cv)
                 plt.savefig(f"./save_sketch/{save_name}/{image_index}.jpg")
                 print(f"{save_name}/{image_index}.jpg is saved!")
+
+        end_time = time.time()
+        # Calcola il tempo totale di esecuzione
+        total_time = end_time - start_time
+
+        print("Tempo di esecuzione:", total_time)
 
     def merge_sketches(self, folder_path):
         image_list = []

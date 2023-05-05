@@ -89,9 +89,6 @@ class SketchData(object):
     def save_sketches(self):
         import time
 
-        # Misura il tempo di inizio
-        start_time = time.time()
-
         category_list = self.getCategory()
         dataset_origin_list = self.load()
 
@@ -110,12 +107,8 @@ class SketchData(object):
                 sample_sketch = dataset_origin_list[category_list.index(sample_category_name)][image_index]
                 sketch_cv = drawsketch.draw_three(sample_sketch, True)
                 start_time = time.time()
-                plt.xticks([])
-                plt.yticks([])
-                plt.axis('off')
-                plt.imshow(sketch_cv)
+                cv2.imwrite(f"./save_sketch/{save_name}/{image_index}.jpg", sketch_cv)
                 end_time = time.time()
-                plt.savefig(f"./save_sketch/{save_name}/{image_index}.jpg")
                 print(f"{save_name}/{image_index}.jpg is saved!")
 
 

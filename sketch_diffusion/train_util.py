@@ -2,6 +2,7 @@ import copy
 import functools
 import os
 import wandb
+import shutil
 from draw_sketch import SketchData
 
 import blobfile as bf
@@ -335,6 +336,9 @@ class TrainLoop:
         sketchdata.save_sketches()
         sketchdata.merge_sketches('save_sketch/samples')
         self.run.log({"samples": wandb.Image("merged_sketch.jpg")})
+        shutil.rmtree('./save_sketch', ignore_errors=True)
+        os.remove(f"{save_path}.npz")
+        os.remove("merged_sketch.jpg")
 
     def _master_params_to_state_dict(self, master_params):
         if self.use_fp16:

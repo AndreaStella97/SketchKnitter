@@ -86,7 +86,7 @@ class SketchData(object):
         category_list = os.listdir(self.dataPath)
         return category_list
 
-    def save_sketches(self):
+    def save_sketches(self, num_sketches):
         category_list = self.getCategory()
         dataset_origin_list = self.load()
 
@@ -100,7 +100,7 @@ class SketchData(object):
                 print(f"./save_sketch/{save_name}/ is new mkdir!")
             drawsketch = DrawSketch()
 
-            for image_index in range(10):
+            for image_index in range(num_sketches):
                 # sample_sketch = dataset_origin_list[sample_category_name.index(sample_category_name)][index]
                 sample_sketch = dataset_origin_list[category_list.index(sample_category_name)][image_index]
                 sketch_cv = drawsketch.draw_three(sample_sketch, True)
@@ -130,4 +130,4 @@ class SketchData(object):
  
 if __name__ == '__main__':
     sketchdata = SketchData(dataPath='./train_samples')
-    sketchdata.save_sketches()
+    sketchdata.save_sketches(10)

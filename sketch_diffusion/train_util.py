@@ -332,7 +332,7 @@ class TrainLoop:
         np.savez_compressed(save_path, train=sample_all)
 
         sketchdata = SketchData(dataPath=self.train_samples_dir)
-        sketchdata.save_sketches()
+        sketchdata.save_sketches(self.sample_batch_size)
         sketchdata.merge_sketches('save_sketch/samples')
         self.run.log({"samples": wandb.Image("merged_sketch.jpg")})
 

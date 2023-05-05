@@ -124,8 +124,7 @@ class TrainLoop:
             self.use_ddp = False
             self.ddp_model = self.model
 
-        #self.run = wandb.init(project="diffusion_model_vectorized", entity="andrea_stella_thesis")
-        self.sketchdata = SketchData(dataPath=self.train_samples_dir)
+        self.run = wandb.init(project="diffusion_model_vectorized", entity="andrea_stella_thesis")
 
     def _load_and_sync_parameters(self):
         resume_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
@@ -235,7 +234,7 @@ class TrainLoop:
 
             loss = (losses["loss"] * weights).mean()  # loss = (0.9931, device='cuda:0', grad_fn=<MeanBackward0>)
 
-            #self.run.log({'loss': loss})
+            self.run.log({'loss': loss})
 
             log_loss_dict(
                 self.diffusion, t, {k: v * weights for k, v in losses.items()}
@@ -332,9 +331,10 @@ class TrainLoop:
         save_path = f"{self.train_samples_dir}/samples"
         np.savez_compressed(save_path, train=sample_all)
 
-        self.sketchdata.save_sketches()
-        self.sketchdata.merge_sketches('save_sketch/samples')
-        #self.run.log({"samples": wandb.Image("merged_sketch.jpg")})
+        sketchdata = SketchData(dataPath=self.train_samples_dir)
+        sketchdata.save_sketches()
+        sketchdata.merge_sketches('save_sketch/samples')
+        self.run.log({"samples": wandb.Image("merged_sketch.jpg")})
 
     def _master_params_to_state_dict(self, master_params):
         if self.use_fp16:

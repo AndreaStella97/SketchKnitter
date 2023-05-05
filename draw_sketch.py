@@ -87,8 +87,6 @@ class SketchData(object):
         return category_list
 
     def save_sketches(self):
-        import time
-
         category_list = self.getCategory()
         dataset_origin_list = self.load()
 
@@ -106,16 +104,8 @@ class SketchData(object):
                 # sample_sketch = dataset_origin_list[sample_category_name.index(sample_category_name)][index]
                 sample_sketch = dataset_origin_list[category_list.index(sample_category_name)][image_index]
                 sketch_cv = drawsketch.draw_three(sample_sketch, True)
-                start_time = time.time()
                 cv2.imwrite(f"./save_sketch/{save_name}/{image_index}.jpg", sketch_cv)
-                end_time = time.time()
                 print(f"{save_name}/{image_index}.jpg is saved!")
-
-
-        # Calcola il tempo totale di esecuzione
-        total_time = end_time - start_time
-
-        print("Tempo di esecuzione:", total_time)
 
     def merge_sketches(self, folder_path):
         image_list = []

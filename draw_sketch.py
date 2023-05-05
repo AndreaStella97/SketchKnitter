@@ -108,14 +108,14 @@ class SketchData(object):
             for image_index in range(10):
                 # sample_sketch = dataset_origin_list[sample_category_name.index(sample_category_name)][index]
                 sample_sketch = dataset_origin_list[category_list.index(sample_category_name)][image_index]
-                start_time = time.time()
                 sketch_cv = drawsketch.draw_three(sample_sketch, True)
-                end_time = time.time()
                 plt.xticks([])
                 plt.yticks([])
                 plt.axis('off')
                 plt.imshow(sketch_cv)
+                start_time = time.time()
                 plt.savefig(f"./save_sketch/{save_name}/{image_index}.jpg")
+                end_time = time.time()
                 print(f"{save_name}/{image_index}.jpg is saved!")
 
 

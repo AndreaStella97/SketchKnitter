@@ -105,11 +105,12 @@ class SketchData(object):
                 print(f"./save_sketch/{save_name}/ is new mkdir!")
             drawsketch = DrawSketch()
 
-            start_time = time.time()
             for image_index in range(10):
                 # sample_sketch = dataset_origin_list[sample_category_name.index(sample_category_name)][index]
                 sample_sketch = dataset_origin_list[category_list.index(sample_category_name)][image_index]
+                start_time = time.time()
                 sketch_cv = drawsketch.draw_three(sample_sketch, True)
+                end_time = time.time()
                 plt.xticks([])
                 plt.yticks([])
                 plt.axis('off')
@@ -117,7 +118,7 @@ class SketchData(object):
                 plt.savefig(f"./save_sketch/{save_name}/{image_index}.jpg")
                 print(f"{save_name}/{image_index}.jpg is saved!")
 
-            end_time = time.time()
+
         # Calcola il tempo totale di esecuzione
         total_time = end_time - start_time
 

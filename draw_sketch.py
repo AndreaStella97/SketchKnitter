@@ -104,7 +104,11 @@ class SketchData(object):
                 # sample_sketch = dataset_origin_list[sample_category_name.index(sample_category_name)][index]
                 sample_sketch = dataset_origin_list[category_list.index(sample_category_name)][image_index]
                 sketch_cv = drawsketch.draw_three(sample_sketch, True)
-                cv2.imwrite(f"./save_sketch/{save_name}/{image_index}.jpg", sketch_cv)
+                border_color = (255, 255, 255)
+                border_size = 10
+                sketch_cv_with_border = cv2.copyMakeBorder(sketch_cv, border_size, border_size, border_size,
+                                                           border_size, cv2.BORDER_CONSTANT, value=border_color)
+                cv2.imwrite(f"./save_sketch/{save_name}/{image_index}.jpg", sketch_cv_with_border)
                 print(f"{save_name}/{image_index}.jpg is saved!")
 
     def merge_sketches(self, folder_path):

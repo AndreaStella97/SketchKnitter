@@ -45,7 +45,7 @@ def main():
         data_dir=args.data_dir,
         batch_size=args.batch_size,
         image_size=args.image_size,
-        category=["apple.npz"],
+        category=["house.npz"],
         class_cond=False,
     )
 
@@ -72,7 +72,8 @@ def main():
         use_ddim=args.use_ddim,
         clip_denoised=args.clip_denoised,
         train_samples_dir=args.train_samples_dir,
-        pen_break=args.pen_break
+        pen_break=args.pen_break,
+        training_steps=args.training_steps
     ).run_loop()
 
 
@@ -97,7 +98,8 @@ def create_argparser():
         use_ddim=False,
         clip_denoised=True,
         train_samples_dir='./train_samples',
-        pen_break=0.5
+        pen_break=0.5,
+        training_steps=100000
     )
     defaults.update(model_and_diffusion_defaults())
     parser = argparse.ArgumentParser()

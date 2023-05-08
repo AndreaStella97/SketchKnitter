@@ -52,7 +52,8 @@ class TrainLoop:
             use_ddim=False,
             clip_denoised=True,
             train_samples_dir='./train_samples',
-            pen_break=0.5
+            pen_break=0.5,
+            training_steps=100000
     ):
         self.model = model
         self.diffusion = diffusion
@@ -80,6 +81,7 @@ class TrainLoop:
         self.clip_denoised = clip_denoised
         self.train_samples_dir = train_samples_dir
         self.pen_break = pen_break
+        self.training_steps = training_steps
 
         self.step = 0
         self.resume_step = 0
@@ -175,7 +177,7 @@ class TrainLoop:
 
     def run_loop(self):
         while (
-                self.step + self.resume_step < 50001
+                self.step + self.resume_step < self.training_steps
         ):
             batch, _ = next(self.data)
             batch = batch.to(dist_util.dev())

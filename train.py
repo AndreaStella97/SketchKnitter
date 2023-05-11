@@ -45,7 +45,7 @@ def main():
         data_dir=args.data_dir,
         batch_size=args.batch_size,
         image_size=args.image_size,
-        category=["airplane.npz"],
+        category=[args.category],
         class_cond=False,
     )
 
@@ -99,7 +99,8 @@ def create_argparser():
         clip_denoised=True,
         train_samples_dir='./train_samples',
         pen_break=0.5,
-        training_steps=100000
+        training_steps=100000,
+        category=""
     )
     defaults.update(model_and_diffusion_defaults())
     parser = argparse.ArgumentParser()

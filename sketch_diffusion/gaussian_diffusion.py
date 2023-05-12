@@ -550,7 +550,7 @@ class GaussianDiffusion:
             if "vb" in terms: 
                 terms["loss"] = terms["mse"]
             else:
-                terms["loss"] = terms["mse"] + 0.01 * terms["pen_state"]   
+                terms["loss"] = terms["mse"] + 0.5 * terms["pen_state"]
         else:
             raise NotImplementedError(self.loss_type)
 

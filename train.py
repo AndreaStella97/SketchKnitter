@@ -45,8 +45,8 @@ def main():
         data_dir=args.data_dir,
         batch_size=args.batch_size,
         image_size=args.image_size,
-        category=[args.category],
-        class_cond=False,
+        category=["apple.npz", "bus.npz", "fish.npz"],
+        class_cond=True,
     )
 
     logger.log("training...")

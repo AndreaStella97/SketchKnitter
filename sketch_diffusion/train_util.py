@@ -22,7 +22,7 @@ from .fp16_util import (
 from .nn import update_ema
 from .resample import LossAwareSampler, UniformSampler
 
-from sample import bin_pen
+from sample import bin_pen, get_pen_state
 
 INITIAL_LOG_LOSS_SCALE = 20.0
 
@@ -326,7 +326,7 @@ class TrainLoop:
             model_kwargs={},
         )
         sample_all = th.cat((sample, pen_state), 2).cpu()
-        sample_all = bin_pen(sample_all, self.pen_break)
+        sample_all = get_pen_state(sample_all)
         sample_all = sample_all.numpy()[:, :, :-1]
         save_path = f"{self.train_samples_dir}/samples"
         np.savez_compressed(save_path, train=sample_all)

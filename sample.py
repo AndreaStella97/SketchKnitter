@@ -22,10 +22,23 @@ def bin_pen(x, pen_break=0.005):
         for j in range(x.size()[1]):
                 pen = x[i][j][2]
                 if pen >= pen_break:
-                    result[i][j][2] = 0
-                else:
                     result[i][j][2] = 1
+                else:
+                    result[i][j][2] = 0
     return result
+
+def get_pen_state(x):
+    result = x
+    for i in range(x.size()[0]):
+        for j in range(x.size()[1]):
+            prob_0 = x[i][j][2]
+            prob_1 = x[i][j][3]
+            if prob_0 > prob_1:
+                result[i][j][2] = 0
+            else:
+                result[i][j][2] = 1
+    return result
+
 class_cond=False,
 def main():
     args = create_argparser().parse_args()

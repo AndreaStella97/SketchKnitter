@@ -22,9 +22,9 @@ def bin_pen(x, pen_break=0.005):
         for j in range(x.size()[1]):
                 pen = x[i][j][2]
                 if pen >= pen_break:
-                    result[i][j][2] = 1
-                else:
                     result[i][j][2] = 0
+                else:
+                    result[i][j][2] = 1
     return result
 class_cond=False,
 def main():
@@ -65,7 +65,7 @@ def main():
         sample_fn = (
             diffusion.p_sample_loop if not args.use_ddim else diffusion.ddim_sample_loop
         )
-        sample, pen_state, model_output = sample_fn(
+        sample, pen_state, _ = sample_fn(
             model,
             (args.batch_size, 96, 2),
             clip_denoised=args.clip_denoised,

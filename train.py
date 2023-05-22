@@ -42,7 +42,7 @@ def main():
         data_dir=args.data_dir,
         batch_size=args.batch_size,
         image_size=args.image_size,
-        category=["apple.npz"],
+        category=[args.category],
         class_cond=False,
     )
 

@@ -33,7 +33,6 @@ class TrainLoop:
             *,
             model,
             diffusion,
-            diffusion_noise,
             data,
             batch_size,
             microbatch,
@@ -57,7 +56,6 @@ class TrainLoop:
     ):
         self.model = model
         self.diffusion = diffusion
-        self.diffusion_noise = diffusion_noise
         self.data = data
         self.batch_size = batch_size
         self.microbatch = microbatch if microbatch > 0 else batch_size
@@ -319,7 +317,7 @@ class TrainLoop:
     def log_sample(self):
         logger.log("sampling...")
         sample_fn = (
-            self.diffusion_noise.p_sample_loop if not self.use_ddim else self.diffusion_noise.ddim_sample_loop
+            self.diffusion.p_sample_loop if not self.use_ddim else self.diffusion.ddim_sample_loop
         )
         sample, pen_state, model_output = sample_fn(
             self.model,

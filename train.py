@@ -8,7 +8,7 @@ from sketch_diffusion.script_util import (
     model_and_diffusion_defaults,
     create_model_and_diffusion,  # you can change mode here
     args_to_dict,
-    add_dict_to_argparser, create_model_and_diffusion_noise,
+    add_dict_to_argparser,
 )
 from sketch_diffusion.train_util import TrainLoop
 
@@ -36,9 +36,6 @@ def main():
     schedule_sampler = create_named_schedule_sampler(args.schedule_sampler, diffusion)
 
     logger.log("creating diffusion noise...")
-    diffusion_noise = create_model_and_diffusion_noise(
-        **args_to_dict(args, model_and_diffusion_defaults().keys())
-    )[1]
 
     logger.log("creating data loader...")
     data = load_data(
@@ -53,7 +50,6 @@ def main():
     TrainLoop(
         model=model,
         diffusion=diffusion,
-        diffusion_noise=diffusion_noise,
         data=data,
         batch_size=args.batch_size,
         microbatch=args.microbatch,

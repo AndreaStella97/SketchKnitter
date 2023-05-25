@@ -3,6 +3,7 @@ import functools
 import os
 import wandb
 from draw_sketch import SketchData
+import random
 
 import blobfile as bf
 import numpy as np
@@ -23,6 +24,7 @@ from .nn import update_ema
 from .resample import LossAwareSampler, UniformSampler
 
 from sample import bin_pen
+from .script_util import NUM_CLASSES
 
 INITIAL_LOG_LOSS_SCALE = 20.0
 
@@ -52,7 +54,8 @@ class TrainLoop:
             clip_denoised=True,
             train_samples_dir='./train_samples',
             pen_break=0.5,
-            training_steps=100000
+            training_steps=100000,
+            class_cond=False
     ):
         self.model = model
         self.diffusion = diffusion
@@ -80,6 +83,7 @@ class TrainLoop:
         self.train_samples_dir = train_samples_dir
         self.pen_break = pen_break
         self.training_steps = training_steps
+        self.class_cond = class_cond
 
         self.step = 0
         self.resume_step = 0
@@ -177,11 +181,11 @@ class TrainLoop:
         while (
                 self.step + self.resume_step < self.training_steps
         ):
-            batch, _ = next(self.data)
+            batch, labels = next(self.data)
             batch = batch.to(dist_util.dev())
             if self.use_fp16:
                 batch = batch.type(th.FloatTensor)
-            self.run_step(batch, {})
+            self.run_step(batch, labels)
             if self.step % self.log_interval == 0:
                 logger.dumpkvs()
             if self.step % self.save_interval == 0:
@@ -316,6 +320,14 @@ class TrainLoop:
 
     def log_sample(self):
         logger.log("sampling...")
+        model_kwargs = {}
+        if self.class_cond:
+            label = random.randint(0, NUM_CLASSES-1)
+            classes = th.randint(
+                low=label, high=label+1, size=(self.sample_batch_size,), device=dist_util.dev()
+            )
+            model_kwargs["y"] = classes
+            self.run.log({"labels": label})
         sample_fn = (
             self.diffusion.p_sample_loop if not self.use_ddim else self.diffusion.ddim_sample_loop
         )
@@ -323,7 +335,7 @@ class TrainLoop:
             self.model,
             (self.sample_batch_size, 96, 2),
             clip_denoised=self.clip_denoised,
-            model_kwargs={},
+            model_kwargs=model_kwargs,
         )
         pen_state = th.softmax(pen_state, dim=1)
         sample_all = th.cat((sample, pen_state), 2).cpu()

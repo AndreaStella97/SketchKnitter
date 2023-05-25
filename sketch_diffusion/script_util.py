@@ -34,7 +34,7 @@ def model_and_diffusion_defaults():
         dropout=0.0,
         learn_sigma=False,
         sigma_small=False,
-        class_cond=False,
+        class_cond=True,
         diffusion_steps=1000,
         noise_schedule="linear",
         timestep_respacing="",

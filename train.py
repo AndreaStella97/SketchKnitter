@@ -42,8 +42,8 @@ def main():
         data_dir=args.data_dir,
         batch_size=args.batch_size,
         image_size=args.image_size,
-        category=[args.category],
-        class_cond=False,
+        category=["apple.npz", "spider.npz", "airplane.npz"],
+        class_cond=args.class_cond,
     )
 
     logger.log("training...")
@@ -69,7 +69,8 @@ def main():
         clip_denoised=args.clip_denoised,
         train_samples_dir=args.train_samples_dir,
         pen_break=args.pen_break,
-        training_steps=args.training_steps
+        training_steps=args.training_steps,
+        class_cond=args.class_cond
     ).run_loop()
 
 
@@ -96,7 +97,7 @@ def create_argparser():
         train_samples_dir='./train_samples',
         pen_break=0.5,
         training_steps=100000,
-        category=""
+        class_cond=False
     )
     defaults.update(model_and_diffusion_defaults())
     parser = argparse.ArgumentParser()

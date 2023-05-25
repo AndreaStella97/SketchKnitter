@@ -16,7 +16,6 @@ from sketch_diffusion.train_util import TrainLoop
 def main():
     args = create_argparser().parse_args()
     print(args)
-
     if not os.path.exists(args.log_dir):
         os.makedirs(args.log_dir)
     if not os.path.exists(args.log_dir):
@@ -42,7 +41,7 @@ def main():
         data_dir=args.data_dir,
         batch_size=args.batch_size,
         image_size=args.image_size,
-        category=["apple.npz", "spider.npz", "airplane.npz"],
+        category=args.category,
         class_cond=args.class_cond,
     )
 
@@ -102,6 +101,7 @@ def create_argparser():
     defaults.update(model_and_diffusion_defaults())
     parser = argparse.ArgumentParser()
     add_dict_to_argparser(parser, defaults)
+    parser.add_argument('--category', type=str, nargs='+')
     return parser
 
 

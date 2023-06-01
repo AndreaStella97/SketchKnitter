@@ -182,6 +182,8 @@ class TrainLoop:
                 self.step + self.resume_step < self.training_steps
         ):
             batch, labels = next(self.data)
+            if not self.class_cond:
+                labels = {}
             batch = batch.to(dist_util.dev())
             if self.use_fp16:
                 batch = batch.type(th.FloatTensor)

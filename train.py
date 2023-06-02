@@ -95,8 +95,7 @@ def create_argparser():
         clip_denoised=True,
         train_samples_dir='./train_samples',
         pen_break=0.5,
-        training_steps=100000,
-        class_cond=False
+        training_steps=100000
     )
     defaults.update(model_and_diffusion_defaults())
     parser = argparse.ArgumentParser()

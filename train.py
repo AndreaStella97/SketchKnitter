@@ -31,7 +31,15 @@ def main():
         **args_to_dict(args, model_and_diffusion_defaults().keys())
     )
 
-    model.to(dist_util.dev())
+    if args.model_path != "":
+        model.load_state_dict(
+            dist_util.load_state_dict(args.model_path, map_location="cpu")
+        )
+        model.to(dist_util.dev())
+        model.eval()
+    else:
+        model.to(dist_util.dev())
+
     schedule_sampler = create_named_schedule_sampler(args.schedule_sampler, diffusion)
 
     logger.log("creating diffusion noise...")
@@ -95,7 +103,8 @@ def create_argparser():
         clip_denoised=True,
         train_samples_dir='./train_samples',
         pen_break=0.5,
-        training_steps=100000
+        training_steps=100000,
+        model_path = ""
     )
     defaults.update(model_and_diffusion_defaults())
     parser = argparse.ArgumentParser()

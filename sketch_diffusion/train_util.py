@@ -306,7 +306,7 @@ class TrainLoop:
                 with bf.BlobFile(bf.join(get_blob_logdir(), filename), "wb") as f:
                     th.save(state_dict, f)
                     artifact = wandb.Artifact('model', type='model')
-                    artifact.add_file(f)
+                    artifact.add_file(bf.join(get_blob_logdir(), filename))
                     self.run.log_artifact(artifact)
 
                 print('save model at : {}'.format(bf.join(get_blob_logdir(), filename)))

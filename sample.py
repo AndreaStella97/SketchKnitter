@@ -14,7 +14,8 @@ from sketch_diffusion.script_util import (
     add_dict_to_argparser,
     args_to_dict,
 )
-from draw_sketch import DrawSketch
+from draw_sketch import DrawSketch, SketchData
+
 
 def bin_pen(x, pen_break=0.005):
     result = x
@@ -56,40 +57,42 @@ def main():
     logger.log("sampling...")
     all_images = []
     img_index = 0
-    while len(all_images) * args.batch_size < args.num_samples:
-        model_kwargs = {}
-        if args.class_cond:
-            classes = th.randint(
-                low=0, high=NUM_CLASSES, size=(args.batch_size,), device=dist_util.dev()
-            )
-            model_kwargs["y"] = classes
-        sample_fn = (
-            diffusion.p_sample_loop if not args.use_ddim else diffusion.ddim_sample_loop
+    #while len(all_images) * args.batch_size < args.num_samples:
+    model_kwargs = {}
+    if args.class_cond:
+        classes = th.randint(
+            low=0, high=NUM_CLASSES, size=(args.batch_size,), device=dist_util.dev()
         )
-        sample, pen_state, _ = sample_fn(
-            model,
-            (args.batch_size, 96, 2),
-            clip_denoised=args.clip_denoised,
-            model_kwargs=model_kwargs,
-        )
-        pen_state = th.softmax(pen_state, dim=1)
-        sample_all = th.cat((sample, pen_state), 2).cpu()
-        sample_all = bin_pen(sample_all, args.pen_break)
-        sample_all = sample_all.numpy()
-        save_path = f"{args.save_path}/sample{str(img_index)}"
-        np.save(save_path, sample_all)
-        print(f"sample all {sample_all} is saved!")
-        img_index += 1
+        model_kwargs["y"] = classes
+    sample_fn = (
+        diffusion.p_sample_loop if not args.use_ddim else diffusion.ddim_sample_loop
+    )
+    sample, pen_state, _ = sample_fn(
+        model,
+        (args.batch_size, 96, 2),
+        clip_denoised=args.clip_denoised,
+        model_kwargs=model_kwargs,
+    )
+    pen_state = th.softmax(pen_state, dim=1)
+    sample_all = th.cat((sample, pen_state), 2).cpu()
+    sample_all = bin_pen(sample_all, args.pen_break)
+    sample_all = sample_all.numpy()[:, :, :-1]
+    #save_path = f"{args.save_path}/sample{str(img_index)}"
+    save_path = f"{args.save_path}/samples"
+    #np.save(save_path, sample_all)
+    np.savez_compressed(save_path, train=sample_all)
+    print(f"sample all {sample_all} is saved!")
+    img_index += 1
 
 def create_argparser():
     defaults = dict(
         clip_denoised=True,
         num_samples=5000,
-        batch_size=16,
+        batch_size=8,
         use_ddim=False,
         model_path="",
         log_dir='',
-        save_path="",
+        save_path="save_results",
         pen_break=0.5,
     )
     defaults.update(model_and_diffusion_defaults())
@@ -99,5 +102,7 @@ def create_argparser():
 
 
 if __name__ == "__main__":
-    draw = DrawSketch()
     main()
+    sketchdata = SketchData(dataPath="save_results")
+    sketchdata.save_sketches(8)
+    sketchdata.merge_sketches('save_sketch/samples')

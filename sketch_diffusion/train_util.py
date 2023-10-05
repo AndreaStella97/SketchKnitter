@@ -200,7 +200,7 @@ class TrainLoop:
                 self.save()
                 if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:
                     return
-            if self.step % self.sample_interval == 0:
+            #if self.step % self.sample_interval == 0:
                 #self.log_sample()
             self.step += 1
         if (self.step - 1) % self.save_interval != 0:

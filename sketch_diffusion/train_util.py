@@ -315,7 +315,7 @@ class TrainLoop:
                     artifact.add_file(bf.join(get_blob_logdir(), filename))
                     self.run.log_artifact(artifact)
                     if rate:
-                        log_sample(bf.join(get_blob_logdir(), filename))
+                        self.log_sample(bf.join(get_blob_logdir(), filename))
 
                 print('save model at : {}'.format(bf.join(get_blob_logdir(), filename)))
 

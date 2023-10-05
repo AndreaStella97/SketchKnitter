@@ -321,9 +321,6 @@ class TrainLoop:
         for rate, params in zip(self.ema_rate, self.ema_params):
             save_checkpoint(rate, params)
         
-        model_path = bf.join(get_blob_logdir(), f"ema_{self.ema_rate[0]}_{(self.step + self.resume_step):06d}.pt")
-        self.log_sample(model_path)
-
         if dist.get_rank() == 0:
             with bf.BlobFile(
                     bf.join(get_blob_logdir(), f"opt{(self.step + self.resume_step):06d}.pt"),
@@ -332,9 +329,14 @@ class TrainLoop:
                 th.save(self.opt.state_dict(), f)
 
         dist.barrier()
+        
+        model_path = bf.join(get_blob_logdir(), f"ema_{self.ema_rate[0]}_{(self.step + self.resume_step):06d}.pt")
+        self.log_sample(model_path)
+
 
     def log_sample(self, model_path):
         logger.log("sampling...")
+        dist_util.setup_dist()
         
         ema_model, _ = create_model_and_diffusion(**model_and_diffusion_defaults())
         ema_model.load_state_dict(

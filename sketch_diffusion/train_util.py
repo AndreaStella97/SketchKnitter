@@ -335,7 +335,7 @@ class TrainLoop:
     def log_sample(self, model_path):
         logger.log("sampling...")
         
-        ema_model, _ = create_model_and_diffusion(model_and_diffusion_defaults())
+        ema_model, _ = create_model_and_diffusion(**model_and_diffusion_defaults())
         ema_model.load_state_dict(
             dist_util.load_state_dict(model_path, map_location="cpu")
         )

@@ -24,7 +24,13 @@ from .nn import update_ema
 from .resample import LossAwareSampler, UniformSampler
 
 from sample import bin_pen
-from .script_util import NUM_CLASSES
+
+from .script_util import (
+    NUM_CLASSES,
+    model_and_diffusion_defaults,
+    create_model_and_diffusion
+)
+from sketch_diffusion import dist_util, logger
 
 INITIAL_LOG_LOSS_SCALE = 20.0
 
@@ -195,7 +201,7 @@ class TrainLoop:
                 if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:
                     return
             if self.step % self.sample_interval == 0:
-                self.log_sample()
+                #self.log_sample()
             self.step += 1
         if (self.step - 1) % self.save_interval != 0:
             self.save()
@@ -308,6 +314,8 @@ class TrainLoop:
                     artifact = wandb.Artifact('model', type='model')
                     artifact.add_file(bf.join(get_blob_logdir(), filename))
                     self.run.log_artifact(artifact)
+                    if rate:
+                        log_sample(bf.join(get_blob_logdir(), filename))
 
                 print('save model at : {}'.format(bf.join(get_blob_logdir(), filename)))
 
@@ -324,8 +332,16 @@ class TrainLoop:
 
         dist.barrier()
 
-    def log_sample(self):
+    def log_sample(self, model_path):
         logger.log("sampling...")
+        
+        ema_model, _ = create_model_and_diffusion(model_and_diffusion_defaults())
+        ema_model.load_state_dict(
+            dist_util.load_state_dict(model_path, map_location="cpu")
+        )
+        ema_model.to(dist_util.dev())
+        ema_model.eval()
+        
         model_kwargs = {}
         if self.class_cond:
             label = random.randint(0, NUM_CLASSES-1)
@@ -338,7 +354,7 @@ class TrainLoop:
             self.diffusion.p_sample_loop if not self.use_ddim else self.diffusion.ddim_sample_loop
         )
         sample, pen_state, model_output = sample_fn(
-            self.model,
+            ema_model,
             (self.sample_batch_size, 96, 2),
             clip_denoised=self.clip_denoised,
             model_kwargs=model_kwargs,
@@ -355,7 +371,7 @@ class TrainLoop:
         sketchdata.merge_sketches('save_sketch/samples')
         self.run.log({"samples": wandb.Image("merged_sketch.jpg")})
 
-    def _master_params_to_state_dict(self, master_params):
+    def _master_params_to_state_dict(self,  master_params):
         if self.use_fp16:
             master_params = unflatten_master_params(
                 self.model.parameters(), master_params
@@ -410,3 +426,4 @@ def log_loss_dict(diffusion, ts, losses):
         for sub_t, sub_loss in zip(ts.cpu().numpy(), values.detach().cpu().numpy()):
             quartile = int(4 * sub_t / diffusion.num_timesteps)
             logger.logkv_mean(f"{key}_q{quartile}", sub_loss)
+

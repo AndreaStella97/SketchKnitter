@@ -314,14 +314,14 @@ class TrainLoop:
                     artifact = wandb.Artifact('model', type='model')
                     artifact.add_file(bf.join(get_blob_logdir(), filename))
                     self.run.log_artifact(artifact)
-                    if rate:
-                        self.log_sample(bf.join(get_blob_logdir(), filename))
 
                 print('save model at : {}'.format(bf.join(get_blob_logdir(), filename)))
 
         save_checkpoint(0, self.master_params)
         for rate, params in zip(self.ema_rate, self.ema_params):
             save_checkpoint(rate, params)
+        
+        self.log_sample(bf.join(get_blob_logdir(), f"ema_{self.ema_rate}_{(self.step + self.resume_step):06d}.pt"))
 
         if dist.get_rank() == 0:
             with bf.BlobFile(
